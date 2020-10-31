@@ -265,8 +265,8 @@ ax.spines['top'].set_visible(False)
 plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Late', fontsize=25, labelpad=10)
-plt.title("Days Registered Beyond the 21 Day Legal Limit", pad = 20, fontsize = 30)
-#plt.savefig('figures/late_registration.svg')
+plt.title("a. Days Registered Beyond the 21 Day Legal Limit", pad = 20, fontsize = 30)
+#plt.savefig('figures/late_registration_1a.svg')
 
 # +
 #Outcome here is legal registration
@@ -279,14 +279,42 @@ conf = simple_logistic_regression(y_reg,x_reg,cis=.001)
 conf
 
 # +
+#Use this cell to check crude regression analysis of interest:
+
+crude_x = pr_df[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
+
+simple_logistic_regression(y_reg,crude_x,cis=.001)
+
+# +
 reg_rank = create_ranking(pr_df, 'legal_reg', marker=0)
 #r_top_10_prct = reg_rank.legal_reg.quantile(.95)
 reg_rank_merge = reg_rank.merge(covered_trials, on='sponsor')
-#reg_rank_merge['prct'] = round((reg_rank_merge['legal_reg'] / reg_rank_merge['covered_trials']) * 100,2)
+reg_rank_merge['prct'] = round((reg_rank_merge['legal_reg'] / reg_rank_merge['covered_trials']) * 100,2)
 
 #Check beyond top 10 to make sure no ties
-reg_rank_merge.sort_values(by='legal_reg', ascending=False).head(11)
+reg_rank_merge[reg_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).head(11)
+
+# +
+comp_by_year = pr_df[['study_first_submitted_date', 'legal_reg']].groupby(pr_df.study_first_submitted_date.dt.year).agg(['sum', 'count'])
+
+comp_by_year['prct_comp'] = round((comp_by_year['legal_reg']['sum'] / comp_by_year['legal_reg']['count']) * 100,2)
+
+reg_trends = comp_by_year[(comp_by_year.index >= 2009) & (comp_by_year.index <= 2019)]['prct_comp']
+
+fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
+plt.plot(reg_trends, marker='o')
+plt.xticks(reg_trends.index)
+plt.yticks(range(0,101,10))
+plt.grid()
+ax.spines['right'].set_visible(False)
+ax.spines['top'].set_visible(False)
+plt.ylabel('% FDAAA Compliant', fontsize=12, labelpad=5)
+plt.xlabel('Registration Year', fontsize=12, labelpad=7)
+plt.title("Compliant Registrations by Year Registered", pad = 20, fontsize = 15)
+#plt.savefig('figures/reg_trends.svg')
 # -
+
+comp_by_year
 
 # # Last Verified Date
 
@@ -365,8 +393,8 @@ ax.spines['top'].set_visible(False)
 plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Late', fontsize=25, labelpad=10)
-plt.title("Days Late to Verify Trial Data", pad = 20, fontsize = 30)
-#plt.savefig('figures/last_verified.svg')
+plt.title("b. Days Late to Verify Trial Data", pad = 20, fontsize = 30)
+#plt.savefig('figures/last_verified_1b.svg')
 # -
 
 y_veri = cohort.late_veri.replace({0:1, 1:0})
@@ -377,14 +405,22 @@ x_veri = cohort[['act_flag', 'ind_spon', 'drug_trial', 'late_phase', 'N/A', 'qua
 #Outcome here is having a current verification date
 
 simple_logistic_regression(y_veri,x_veri, cis=.001)
-# -
 
+# +
+#Use this cell to check crude regression analysis of interest:
+
+crude_x = cohort[['act_flag']].reset_index(drop=True)
+
+simple_logistic_regression(y_veri,crude_x,cis=.001)
+
+# +
 veri_rank = create_ranking(cohort, 'late_veri')
 #v_top_10_prct = veri_rank.late_veri.quantile(.95)
 veri_rank_merge = veri_rank.merge(covered_trials, on='sponsor')
-#veri_rank_merge['prct'] = round((veri_rank_merge['late_veri'] / veri_rank_merge['covered_trials']) * 100,2)
-veri_rank_merge.sort_values(by='late_veri', ascending=False).head(11)
-#veri_rank[veri_rank.late_veri >= v_top_10_prct].reset_index(drop=True).head()
+veri_rank_merge['prct'] = round((veri_rank_merge['late_veri'] / veri_rank_merge['covered_trials']) * 100,2)
+
+veri_rank_merge[veri_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).head(11)
+# -
 
 # # Certificate Analysis
 
@@ -442,8 +478,8 @@ ax.spines['top'].set_visible(False)
 plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Late', fontsize=25, labelpad=10)
-plt.title("Days Late to Apply for Certificate of Delay", pad = 20, fontsize = 30)
-#plt.savefig('figures/late_certificate.svg')
+plt.title("c. Days Late to Apply for Certificate of Delay", pad = 20, fontsize = 30)
+#plt.savefig('figures/late_certificate_1c.svg')
 # -
 
 x_cert = certificate[['act_flag', 'ind_spon', 'drug_trial', 'late_phase', 'N/A', 'quartile_2', 'quartile_3', 
@@ -454,20 +490,26 @@ y_cert = certificate['on_time_cert'].reset_index(drop=True)
 #Outcome here is having an on-time certificate
 
 simple_logistic_regression(y_cert,x_cert, cis=.001)
+
+# +
+#Use this cell to check crude regression analysis of interest:
+
+crude_x = certificate[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
+
+simple_logistic_regression(y_cert,crude_x,cis=.001)
 # -
 
 cert_rank = create_ranking(certificate, 'late_cert')
 #c_top_10_prct = cert_rank.late_cert.quantile(.95)
 cert_rank_merge = cert_rank.merge(covered_trials, on='sponsor')
 cert_rank_merge['prct'] = round((cert_rank_merge['late_cert'] / cert_rank_merge['covered_trials']) * 100,2)
-cert_rank_merge.sort_values(by='late_cert', ascending=False).reset_index(drop=True).head(20)
-#cert_rank[cert_rank.late_cert >= c_top_10_prct].reset_index(drop=True).head()
+cert_rank_merge[cert_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).reset_index(drop=True).head(11)
 
 # # QC Data
 #
-# Detailed data on the QC process can be attained for all trials that had results posted after 11 May 2018. From the FDAAA TrialsTracker, we had some detailed data available we scraped ourselves but not across all appliable trials, only trials that became due. Data on, at the very least, the time between first submission, final submission and posting date can be garnered for every applicable trial directly from the raw data.
+# From the FDAAA TrialsTracker, we had some detailed data available we scraped ourselves but not across all appliable trials, only trials that became due. Data on, at the very least, the time between first submission, final submission and posting date can be garnered for every applicable trial directly from the raw data.
 #
-# Given that this field is not preserved in the raw XML once results complete the QC process, this database was created through manual assessment of current and historic data. The Notebook `QC Expansion` can aid in recreating the pending data timeline for all trials that were pending on a given date from a processed data file such as the one created in the previous cell
+# Given that this field is not preserved in the raw XML once results complete the QC process, this database was created through manual assessment of current and historic data both held by the DataLab and on the ClincialTrials.gov archive site. The Notebook `QC Expansion` can aid in recreating the pending data timeline for all trials that were pending on a given date from a processed data file such as the one created earlier.
 
 # +
 #Cutting down our full dataset with only what we need for the QC analysis
@@ -479,7 +521,7 @@ qc_cols = ['nct_id', 'results_due', 'due_date', 'available_completion_date', 'pr
 xml_data = df[qc_cols].reset_index(drop=True)
     
 #Calling in our QC data
-data = pd.read_excel(parent + '/data/new_qc_dataset.xlsx')
+data = pd.read_excel(parent + '/data/new_qc_dataset.xlsx', sheet_name='qc_data')
 data['scrape_date'] = pd.Timestamp(2020,1,17)
 
 # +
@@ -638,8 +680,7 @@ qc_data['always_compliant'] = np.where((qc_data.cur_sub_day_outstanding < 25) & 
 pending_all = len(qc_data[(qc_data.qc_data_status == "Pending") | 
                       (qc_data.qc_data_status == "Currently Canceled")])
 available_all = len(qc_data[(qc_data.qc_data_status == "Results Available") | 
-                            (qc_data.qc_data_status == 'Pre-XML Data Field') |
-                           (qc_data.qc_data_status == 'QC Data Unavailable - Never Publicly Pending')])
+                            (qc_data.qc_data_status == 'No Detailed QC Available')])
 
 
 print(f"{len(qc_data)} ({round((len(qc_data))/len(df) * 100,1)}%) of {len(df)} covered trials \
@@ -649,26 +690,18 @@ print(f"{pending_all} are pending ({round((pending_all)/len(qc_data) * 100,1)}%)
 
 print(f"{available_all} are available ({round(available_all/len(qc_data) * 100,1)}%)")
 
-withheld = len(qc_data[qc_data.qc_data_status == 'QC Data Unavailable - Never Publicly Pending'])
+never_pub = len(qc_data[qc_data.qc_data_status == 'No Detailed QC Available'])
 
-print(f'''{withheld} trials ({round(withheld/len(qc_data) * 100,1)}%) were of unapproved devices that had \
-their data previously witheld"''')
+print((f'''{never_pub} trials ({round(never_pub/len(qc_data) * 100,1)}%) do not have detailed QC data available'''))
 
-never_pub = len(qc_data[qc_data.qc_data_status == 'Pre-XML Data Field'])
-
-print((f'''{never_pub} trials ({round(never_pub/len(qc_data) * 100,1)}%) had their full results became \
-available before the QC process was detailed in the public XML data'''))
-
-trials_left = (len(qc_data) - len(qc_data[qc_data.qc_data_status == 'QC Data Unavailable - Never Publicly Pending']) - 
-               len(qc_data[qc_data.qc_data_status == 'Pre-XML Data Field']))
+trials_left = (len(qc_data) - len(qc_data[qc_data.qc_data_status == 'No Detailed QC Available']))
 
 print(f"This leaves {trials_left} ({round(trials_left/len(qc_data) * 100,1)}%) with detailed quality control \
 information available")
 
 # +
 #This is the dataset of only trials with detailed QC data we will use for the remaining analysis
-qc_stats_detailed = qc_data[((qc_data.qc_data_status != 'QC Data Unavailable - Never Publicly Pending') & 
-                             (qc_data.qc_data_status != 'Pre-XML Data Field'))].reset_index(drop=True)
+qc_stats_detailed = qc_data[(qc_data.qc_data_status != 'No Detailed QC Available')].reset_index(drop=True)
 
 #Describing trials with full Results Available
 qc_d = len(qc_stats_detailed)
@@ -720,12 +753,12 @@ sns.distplot(np.clip(curr_pend_qc.cur_sub_day_outstanding,0,400), hist=True, kde
 ax.set_xticklabels(xlabels)
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
-plt.xticks(reg_bins[:-2])
+plt.xticks(qc_bins[:-2])
 plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Since QC Return', fontsize=25, labelpad=10)
-plt.title("Days Currently Outsanding for Pending Trials (n=601)", pad = 20, fontsize = 30)
-plt.savefig('figures/qc_pending_delay.svg')
+plt.title("d. Days Currently Outsanding for Pending Trials (n=601)", pad = 20, fontsize = 30)
+#plt.savefig('figures/qc_pending_delay_1d.svg')
 
 # +
 #Submission Stats
@@ -734,7 +767,7 @@ plt.savefig('figures/qc_pending_delay.svg')
 #out when we only want to talk about re-submissions
 resubmission_count = qc_stats_detailed.submissions.sum() - len(qc_stats_detailed)
 
-print(f"There were {resubmission_count} QC returns from ClincialTrials.gov staff")
+print(f"There were {resubmission_count} resubmission after returns from ClincialTrials.gov staff")
 
 late_resubs = qc_stats_detailed.total_late_subs.sum()
 
@@ -764,12 +797,12 @@ sns.distplot(np.clip(qc_stats_detailed[sponsor_subs].stack(),0,200), hist=True, 
 ax.set_xticklabels(xlabels)
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
-plt.xticks(reg_bins[:-2])
+plt.xticks(qc2_bins[:-2])
 plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days to Resubmission', fontsize=25, labelpad=10)
-plt.title("Time to Resubmission for Returned QC Results", pad = 20, fontsize = 30)
-plt.savefig('figures/qc_rounds.svg')
+plt.title("e. Time to Resubmission for Returned QC Results", pad = 20, fontsize = 30)
+#plt.savefig('figures/qc_rounds_1e.svg')
 
 # +
 #Lets get all trials with full results:
@@ -778,7 +811,9 @@ trials_with_results = qc_stats_detailed[(qc_stats_detailed.results_first_posted_
 
 results_one_submission = trials_with_results[(trials_with_results.submissions == 1) & (trials_with_results.returns == 0)]
 
-results_multiple_submission = trials_with_results[(trials_with_results.submissions > 1) ]
+results_multiple_submission = trials_with_results[(trials_with_results.submissions > 1)]
+
+print(f"Results posted after first submission: {round(((len(results_one_submission)/len(trials_with_results)) * 100),2)}%")
 
 #This is the descriptive statistics for trials that had results made available after a single round of review.
 results_one_submission.time_to_results_nc.describe()
@@ -811,12 +846,44 @@ y_qc = qc_stats_detailed['never_late_resub'].reset_index(drop=True)
 
 conf = simple_logistic_regression(y_qc,x_qc, cis=.001)
 conf
+
+# +
+#Use this cell to check crude regression analysis of interest:
+
+crude_x = qc_stats_detailed[['act_flag']].reset_index(drop=True)
+
+simple_logistic_regression(y_qc,crude_x,cis=.001)
 # -
 
 qc_rank = create_ranking(qc_stats_detailed, 'never_late_resub', marker=0)
 qc_rank_merge = qc_rank.merge(covered_trials, on='sponsor')
-#qc_rank_merge['prct'] = round((qc_rank_merge['never_late_resub'] / qc_rank_merge['covered_trials']) * 100,2)
-qc_rank_merge.sort_values(by='never_late_resub', ascending=False).head(11)
+qc_rank_merge['prct'] = round((qc_rank_merge['never_late_resub'] / qc_rank_merge['covered_trials']) * 100,2)
+qc_rank_merge[qc_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).head(11)
+
+# <b>Zarin et al. 2019 Comparison:</b> 
+#
+# During peer review we were asked to compare our QC findings on first-submission success to Zarin et al. 2019. This piece used a slightly different methodology to examine this compared to ours. Specifically it didn't restrict the analysis to trials with results. This uses a comprable method and looks at the split between industry and non-industry.
+
+# +
+just_pending = qc_data[(qc_data.qc_data_status == "Pending") | 
+                       (qc_data.qc_data_status == "Currently Canceled")].reset_index(drop=True)
+
+pending_returned = just_pending[just_pending.returns != 0]
+print(f"There are {len(pending_returned)} trials that are pending and we know were not successful in round 1")
+print(f"{len(pending_returned[pending_returned.ind_spon==1])} of these from industry and \
+{len(pending_returned[pending_returned.ind_spon==0])} from non-industry")
+
+print(f"Overall first round compliance, including these trials, was {round((len(results_one_submission)/(len(trials_with_results) + len(pending_returned)) * 100),1)}%")
+
+ind_denom = len(trials_with_results[trials_with_results.ind_spon==1]) + len(pending_returned[pending_returned.ind_spon==1])
+ind_num = len(results_one_submission[results_one_submission.ind_spon==1])
+
+non_ind_denom = len(trials_with_results[trials_with_results.ind_spon==0]) + len(pending_returned[pending_returned.ind_spon==0])
+non_ind_num = len(results_one_submission[results_one_submission.ind_spon==0])
+
+print(f"For industry sponsors {round((ind_num/ind_denom) * 100,2)}% succeeded on the first try")
+print(f"For non-industry sponsors {round((non_ind_num/non_ind_denom) * 100,2)}% succeeded on the first try")
+# -
 
 # # Document Analysis
 
@@ -935,6 +1002,7 @@ def f(x):
 
 grouped = full_docs_df.groupby('nct_id').apply(f).reset_index()
 
+#Now we can easily replace those far in the future/past dates with nulls
 grouped.loc[grouped['latest_protocol_submitted'] == '1900-01-01', 'latest_protocol_submitted'] = pd.NaT
 grouped.loc[grouped['latest_sap_submitted'] == '1900-01-01', 'latest_sap_submitted'] = pd.NaT
 grouped.loc[grouped['first_protocol_submitted'] == '2100-01-01', 'first_protocol_submitted'] = pd.NaT
@@ -1033,11 +1101,18 @@ y_docs = just_due_results.docs_accounted.reset_index(drop=True)
 
 conf = simple_logistic_regression(y_docs,x_docs, cis=.001)
 conf
+
+# +
+#Use this cell to check crude regression analysis of interest:
+
+crude_x = just_due_results[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
+
+simple_logistic_regression(y_docs,crude_x,cis=.001)
 # -
 
 docs_rank = create_ranking(just_due_results, 'docs_accounted', marker = 0)
 docs_rank_merge = docs_rank.merge(covered_trials, on='sponsor')
-#docs_rank_merge['prct'] = round((docs_rank_merge['docs_accounted'] / docs_rank_merge['covered_trials']) * 100,2)
-docs_rank_merge.sort_values(by='docs_accounted', ascending=False).reset_index(drop=True)
+docs_rank_merge['prct'] = round((docs_rank_merge['docs_accounted'] / docs_rank_merge['covered_trials']) * 100,2)
+docs_rank_merge[docs_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).head(12)
 
 
