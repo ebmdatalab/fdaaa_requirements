@@ -18,3 +18,7 @@ __pycache__/
 
 # Emacs
 *~
+
+# Custom
+all_trials_2021-01-18.csv
+clinicaltrials_raw_clincialtrials_json_2021-01-18.csv

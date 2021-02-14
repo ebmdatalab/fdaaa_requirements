@@ -10,20 +10,20 @@ from time import time
 from time import sleep
 from io import StringIO
 
-from programs.helper_functions import is_interventional
-from programs.helper_functions import is_covered_phase
-from programs.helper_functions import is_not_withdrawn
-from programs.helper_functions import is_not_device_feasibility
-from programs.helper_functions import is_covered_intervention
-from programs.helper_functions import is_fda_reg
-from programs.helper_functions import is_old_fda_regulated
-from programs.helper_functions import has_us_loc
-from programs.helper_functions import does_it_exist
-from programs.helper_functions import dict_or_none
-from programs.helper_functions import text_or_none
-from programs.helper_functions import variable_levels
-from programs.helper_functions import str_to_date
-from programs.helper_functions import convert_bools_to_ints
+from lib.helper_functions import is_interventional
+from lib.helper_functions import is_covered_phase
+from lib.helper_functions import is_not_withdrawn
+from lib.helper_functions import is_not_device_feasibility
+from lib.helper_functions import is_covered_intervention
+from lib.helper_functions import is_fda_reg
+from lib.helper_functions import is_old_fda_regulated
+from lib.helper_functions import has_us_loc
+from lib.helper_functions import does_it_exist
+from lib.helper_functions import dict_or_none
+from lib.helper_functions import text_or_none
+from lib.helper_functions import variable_levels
+from lib.helper_functions import str_to_date
+from lib.helper_functions import convert_bools_to_ints
 
 def make_row(jcs, fda_reg_dict, scrape_date=date.today()):
     """
