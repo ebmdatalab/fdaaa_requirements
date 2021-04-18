@@ -1,4 +1,4 @@
-# Automated assessments of compliance with the FDAAA 2007
+# Assessments of compliance with various requirements of the FDAAA 2007
 
 ## Overview
 
