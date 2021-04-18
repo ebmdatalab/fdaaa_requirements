@@ -1,4 +1,7 @@
 import csv
+from zipfile import ZipFile
+from requests import get
+from io import BytesIO
 
 def fda_reg(path):
     """
@@ -17,6 +20,17 @@ def get_data(path):
     """
     Quick function to load the raw ClinicalTrials.gov data which is a CSV of JSON (can think of as ndjson as well)
     """
+
+    with ZipFile(BytesIO(get(path, stream=True).content), 'r') as zf:
+        with zf.open('clinicaltrials_raw_clincialtrials_json_2021-01-18.csv', 'r') as ctgov:
+            lines = ctgov.readlines()
+            return lines
+        
+def get_data_local(path):
+    """
+    Quick function to load the raw ClinicalTrials.gov data which is a CSV of JSON (can think of as ndjson as well) when you have a local file
+    """
     with open(path, 'r') as ctgov:
         lines = ctgov.readlines()
         return lines
+        

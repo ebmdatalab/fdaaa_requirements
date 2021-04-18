@@ -15,22 +15,13 @@
 # ---
 
 # +
-import csv
-import json
 import pandas as pd
 import numpy as np
 from datetime import date
-from datetime import datetime
-from datetime import timedelta
-from dateutil.relativedelta import relativedelta 
 from tqdm.auto import tqdm
-import statsmodels.api as sm
 import seaborn as sns
 from zipfile import ZipFile
- 
-from time import time
-from time import sleep
-from io import StringIO
+
 import os
 import re
 import matplotlib.pyplot as plt
@@ -48,64 +39,58 @@ sys.path.append(parent)
 
 # # Loading and Managing Data
 
-# +
-#If the main data file exists, it will read it, if not it will create it from the raw data.
-#See files in lib folder and function docstrings for details of functions.
-#For the full analysis, We've run this process twice, once for all trials and once just for 
-#applicable trials
+# If the processed data files exists (for covered and all trials), it will read it, if not it will create it from the raw data. See files in the `lib` folder and function docstrings for details of functions. The GitHub will always contains the processed data files but interested users should also be able to re-create them from the raw data as needed. The process used to archive the raw data in our storage format is detailed here:
+# https://github.com/ebmdatalab/clinicaltrials-act-converter
+#
+# The processed data is included in this repository in the `data` folder. The raw data is too large to easily store on GitHub so we load it in from Dropbox storage when needed. If the Dropbox link ever fails, you can also download a copy of the raw data from here:
+# https://doi.org/10.6084/m9.figshare.12789902
+#
+# You can then unzip and import/run `get_data_local` instead of `get_data` on the CSV locally to get the processed dataset.
 
+# +
 try:
-    df = pd.read_csv(parent + '/data/applicable_trials_2021-01-18.csv')    
+    df = pd.read_csv(parent + '/data/applicable_trials_2021-01-18.csv')
+    
+    #This file is zipped for easier storage on GitHub.
+    zip_file = ZipFile(parent + '/data/all_trials_2021-01-18.csv.zip')
+    df2 = pd.read_csv(zip_file.open('all_trials_2021-01-18.csv'))
+    del zip_file
+    
 except FileNotFoundError:
     old_fda = parent + '/data/fdaaa_regulatory_snapshot.csv'
     
     #This data is the full ClinicalTrials.gov dataset for 18 Jan 2021.
-    #Due to size, this is not in our GitHub repo, but stored separately on Figshare 
-    #If you want to run this from scratch, unzip to the CSV and make sure the existing processed
-    #data file is deleted or renamed.
-    path = parent + '/data/raw_data/clinicaltrials_raw_clincialtrials_json_2021-01-18.csv'
+    #Due to size, this is not in our GitHub repo, but stored on Dropbox 
+    #You should also be able to download the raw data using this URL
+    path = 'https://www.dropbox.com/s/awlhqwjtkzp6t4b/clinicaltrials_raw_clincialtrials_json_2021-01-18.csv.zip?dl=1'
 
     from lib.data_functions import fda_reg, get_data
 
     fda_reg_dict = fda_reg(old_fda)
     lines = get_data(path)
 
-    #header names needed to create the dataset
-    headers = ['nct_id', 'act_flag', 'included_pact_flag', 'results_due', 'has_results','pending_results', 'pending_data',
-               'has_certificate', 'late_cert', 'certificate_date', "certificate_date_qc", "certificate_posted_date",
-               'primary_completion_date', 'completion_date', 'available_completion_date', 'due_date', 'last_updated_date', 
-               'last_verified_date', 'results_first_submitted_date', 'results_submitted_date_qc', 'results_first_posted_date', 
-               'first_results_submission_any', 'study_first_submitted_date', 'study_submitted_date_qc', 
-               'study_first_posted_date', 'documents', 'sponsor', 'sponsor_type', 'phase', 'location', 'study_status', 
-               'study_type', 'primary_purpose', 'fda_reg_drug', 'fda_reg_device', 'is_fda_regulated', 'discrep_date_status', 
-               'defaulted_date', 'collaborators','start_date', 'used_primary_completion_date', 'defaulted_pcd_flag', 
-               'defaulted_cd_flag', 'intervention_types']
+    #headers is just the list of header names to save space here
+    from lib.final_df import make_row, make_dataframe, headers
 
-    from lib.final_df import make_row, make_dataframe
-
+    #Just pACTs/ACTs
     df = make_dataframe(tqdm(lines), fda_reg_dict, headers, act_filter=True, scrape_date = date(2021,1,18))
     
+    #Everything on CT.gov
     df2 = make_dataframe(tqdm(lines), fda_reg_dict, headers, act_filter=False, scrape_date = date(2021,1,18))
     
+    #We won't need this anymore so deleting to save some memory
     del lines
     
-    #Rename and uncomment this to save as a csv as appropriate
-    df.to_csv(parent + '/data/applicable_trials_2021-01-18.csv', index=False)
-    df2.to_csv(parent + '/data/all_trials_2021-01-18.csv', index=False)
+    #Uncomment this to save as a csv as appropriate
+    #df.to_csv(parent + '/data/applicable_trials_2021-01-18.csv', index=False)
+    #df2.to_csv(parent + '/data/all_trials_2021-01-18.csv', index=False)
 
 # +
 #creating the sponsor size variable for regressions
 
-#This file is zipped for easier storage on GitHub
-zip_file = ZipFile(parent + '/data/all_trials_2021-01-18.csv.zip')
-
-#Load from zipped file
-all_trials = pd.read_csv(zip_file.open('all_trials_2021-01-18.csv'))
-del zip_file
-
 #Getting counts of each sponsor across all of ClinicalTrials.gov
 #Making a single column and dummies
-group = all_trials[['nct_id', 'sponsor']].groupby('sponsor', as_index = False).count()
+group = df2[['nct_id', 'sponsor']].groupby('sponsor', as_index = False).count()
 group.columns = ['sponsor', 'sponsored_trials']
 df = df.merge(group, how='left', on='sponsor')
 df['sponsor_quartile'] = pd.Categorical(pd.qcut(df.sponsored_trials, 4, labels=False), ordered=True)
@@ -125,6 +110,7 @@ print(quartile_ranges.unique())
 app_group = df[['nct_id', 'sponsor']].groupby('sponsor', as_index = False).count()
 app_group.columns = ['sponsor', 'covered_trials']
 df = df.merge(app_group, how='left', on='sponsor')
+
 #This is grouped by mean because each "group" of a single sponsor contains the same number of trials
 #Could easily just be .max() or .min() as well
 covered_trials = df[['sponsor', 'covered_trials']].groupby(by='sponsor', as_index=False).mean()
@@ -162,14 +148,17 @@ for col in date_cols:
     df[col] = pd.to_datetime(df[col])
 # -
 
+analysis_cols = ['act_flag', 'ind_spon', 'drug_trial', 'early_phase', 'late_phase', 'N/A', 
+                 'quartile_1', 'quartile_2', 'quartile_3', 'quartile_4']
+
 #Importing functions created for analysis
-from lib.analysis_functions import crosstab, simple_logistic_regression, create_ranking, get_count
+from lib.analysis_functions import crosstab, simple_logistic_regression, create_ranking, get_count, get_prcts
 
 # # Overall Cohort Description
 
 # +
 #Describing full data
-total = len(all_trials)
+total = len(df2)
 all_applicable = len(df)
 acts = df.act_flag.sum()
 pacts = df.included_pact_flag.sum()
@@ -196,8 +185,19 @@ and {due_reported} ({round(due_reported/results_due * 100 ,1)}%) of the due coho
 # -
 
 
-#For crosstabs on reporting compliance
-crosstab(df[df.results_due == 1], 'compliant_reported', 'quartile_4')
+#Run this function to get reporting compliance crosstabs for any variable of interest 
+crosstab(df[df.results_due == 1], 'compliant_reported', 'act_flag')
+
+# +
+#Values for Table 1
+
+summary = {}
+
+for a in analysis_cols:
+    cross = crosstab(df[df.results_due == 1], 'compliant_reported', a)
+    summary[a] = get_prcts(cross)
+    
+pd.DataFrame(summary).T
 
 # +
 #use this function to get the counts of values for any variable in the dataset
@@ -207,7 +207,13 @@ crosstab(df[df.results_due == 1], 'compliant_reported', 'quartile_4')
 get_count(df, 'sponsor_quartile')
 # -
 
+# ## **Note:** 
+#
+# **The below analyses contain some additional descriptive data for each area (e.g., additional figures, sponsor-level compliance information) not included in the published work due to space limits of the format. This remains in the notebook for any interested parties and to support N. DeVito's doctoral thesis which may draw on this data.**
+
 # # Registration - Prospective and >21 Days Late
+
+# The FDAAA 2007 requires that all covered trials are registered within 21 days of their start date, that is the date in which the first participant is enrolled in the study.
 
 # +
 #Getting the fields we need
@@ -234,11 +240,11 @@ pros_check = pr_df.study_first_submitted_date > pr_df.start_date
 pr_df['pros_reg'] = np.where(pros_check, 0, 1)
 
 # +
-print('{} trials out of {} ({}%) covered trials were registered late by the legal definition'.format(
-    len(pr_df[pr_df.legal_reg == 0]), len(pr_df), round(len(pr_df[pr_df.legal_reg == 0])/len(pr_df) * 100,2)))
+print('{} trials out of {} ({}%) covered trials were registered on time the legal definition'.format(
+    len(pr_df[pr_df.legal_reg == 1]), len(pr_df), round(len(pr_df[pr_df.legal_reg == 1])/len(pr_df) * 100,2)))
 
-print('{} trials out of {} ({}%) covered trials were registered retrospectively'.format(
-    len(pr_df[pr_df.pros_reg == 0]), len(pr_df), round(len(pr_df[pr_df.pros_reg == 0])/len(pr_df) * 100,2)))
+print('{} trials out of {} ({}%) covered trials were registered prospectively'.format(
+    len(pr_df[pr_df.pros_reg == 1]), len(pr_df), round(len(pr_df[pr_df.pros_reg == 1])/len(pr_df) * 100,2)))
 
 # +
 #calculating days late to register by the legal standard
@@ -264,7 +270,6 @@ print(f"{late_acts}% of ACTs were registered late")
 legally_late['days_late'].describe()
 
 # +
-#reg_bins = np.arange(0,int(legally_late['days_late'].max()) + 1, 100)
 reg_bins = np.arange(0,1100 + 1, 100)
 xlabels = ['0', '100', '200', '300', '400', '500', '600', '700', '800', '900', '1000+']
 
@@ -281,6 +286,7 @@ plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Late', fontsize=25, labelpad=10)
 plt.title("a. Days Registered Beyond the 21 Day Legal Limit", pad = 20, fontsize = 30)
+plt.show()
 #plt.savefig('figures/late_registration_1a.svg')
 # -
 
@@ -288,24 +294,38 @@ plt.title("a. Days Registered Beyond the 21 Day Legal Limit", pad = 20, fontsize
 crosstab(pr_df, 'legal_reg','act_flag')
 
 # +
-#Outcome here is legal registration
+#Values for Table 1
+
+summary = {}
+
+for a in analysis_cols:
+    cross = crosstab(pr_df, 'legal_reg', a)
+    summary[a] = get_prcts(cross)
+    
+pd.DataFrame(summary).T
+# -
 
 x_reg = pr_df[['act_flag', 'ind_spon', 'drug_trial', 'late_phase', 'N/A', 
                'quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
 y_reg = pr_df['legal_reg'].reset_index(drop=True)
 
-conf = simple_logistic_regression(y_reg,x_reg,cis=.001)
-conf
-
 # +
 #Use this cell to check crude regression analysis of interest:
 
-crude_x = pr_df[['late_phase', 'N/A']].reset_index(drop=True)
+crude_x = pr_df[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
 
 simple_logistic_regression(y_reg,crude_x,cis=.001)
 
 # +
-# reg_rank = create_ranking(pr_df, 'legal_reg', marker=0)
+#Adjusted model for legal registration
+
+conf = simple_logistic_regression(y_reg,x_reg,cis=.001)
+conf
+
+# +
+#Here we are measuring late registrations so set the "legal_reg" markerer to 0
+
+reg_rank = create_ranking(pr_df, 'legal_reg', marker=0)
 #r_top_10_prct = reg_rank.legal_reg.quantile(.95)
 reg_rank_merge = reg_rank.merge(covered_trials, on='sponsor')
 reg_rank_merge['prct'] = round((reg_rank_merge['legal_reg'] / reg_rank_merge['covered_trials']) * 100,2)
@@ -330,10 +350,13 @@ ax.spines['top'].set_visible(False)
 plt.ylabel('% FDAAA Compliant', fontsize=12, labelpad=5)
 plt.xlabel('Registration Year', fontsize=12, labelpad=7)
 plt.title("Compliant Registrations by Year Registered", pad = 20, fontsize = 15)
+plt.show()
 #plt.savefig('figures/reg_trends.svg')
 # -
 
 # # Last Verified Date
+
+# The Final Rule states that all covered trials are required to verify their data once a year. Here we examine how many trials, registered for more than a year, had verified within the last calendar year.
 
 # +
 cols = ['nct_id', 'has_results', 'pending_results', 'primary_completion_date', 'completion_date', 'study_first_posted_date', 
@@ -374,34 +397,34 @@ print("{} remaining".format(len(cohort)))
 #However, verifications are usually only provided in "Month Year" format with no date. As such, they are defaulted
 #to the beginning of the month. Conservatively, we will treat 1 January 2019 as our cutoff.
 
-# Late Verification = 1, Currently Verified = 0
+# Late Verification = 0, Currently Verified = 1
+cohort['comp_veri'] = np.where(cohort.last_verified_date >= pd.Timestamp(2020,1,1), 1,0)
 cohort['late_veri'] = np.where(cohort.last_verified_date < pd.Timestamp(2020,1,1), 1,0)
-late_veri = cohort.late_veri.sum()
+late_veri = len(cohort[cohort.comp_veri == 0])
 prct_late = round(cohort.late_veri.sum()/len(cohort)*100,1)
-print('{} of {} ({}%) of eligible trials are overdue to verify their records'.format(late_veri, len(cohort), prct_late))   
+print('{} of {} ({}%) of eligible trials are overdue to verify their records'.format(len(cohort)-late_veri, len(cohort), 100-prct_late))   
 
 # +
 #describing the days late for unverified trials
 
 cohort['verification_due'] = cohort.last_verified_date + pd.DateOffset(years=1)
-cohort['days_late'] = np.where(cohort.late_veri == 1, (pd.Timestamp(2021,1,1) - cohort.verification_due) / pd.Timedelta('1 day'), 0)
-cohort[cohort['late_veri'] == 1].days_late.describe()
+cohort['days_late'] = np.where(cohort.comp_veri == 0, (pd.Timestamp(2021,1,1) - cohort.verification_due) / pd.Timedelta('1 day'), 0)
+cohort[cohort['comp_veri'] == 0].days_late.describe()
 
 # +
-late_with_update = len(cohort[(cohort.late_veri == 1) & (cohort.last_updated_date > pd.Timestamp(2020,1,18))])
+late_with_update = len(cohort[(cohort.comp_veri == 0) & (cohort.last_updated_date > pd.Timestamp(2020,1,18))])
 
 print('{} trials with a late verification updated since 1 January 2019'.format(late_with_update))
 print('This is {}% of the currently late trials'.format(round(late_with_update/late_veri * 100,2)))
 
 # +
-#reg_bins = np.arange(0,int(legally_late['days_late'].max()) + 1, 100)
 ver_bins = np.arange(0,1100 + 1, 100)
 xlabels = ['0', '100', '200', '300', '400', '500', '600', '700', '800', '900', '1000+']
 
 fig, ax = plt.subplots(figsize=(20, 15), dpi=300)
 ax.set_axisbelow(True)
 ax.grid(zorder=0)
-sns.distplot(np.clip(cohort[cohort['late_veri'] == 1].days_late,0,1000), hist=True, kde=False, bins=ver_bins, ax=ax,
+sns.distplot(np.clip(cohort[cohort['comp_veri'] == 0].days_late,0,1000), hist=True, kde=False, bins=ver_bins, ax=ax,
              hist_kws = {'zorder':10}).set(xlim=(0,1100))
 plt.xticks(ver_bins)
 ax.set_xticklabels(xlabels)
@@ -411,34 +434,42 @@ plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Late', fontsize=25, labelpad=10)
 plt.title("b. Days Late to Verify Trial Data", pad = 20, fontsize = 30)
+plt.show()
 #plt.savefig('figures/last_verified_1b.svg')
 # -
 
-a = crosstab(cohort, 'late_veri', 'act_flag')
-print(a['All'].iloc[1])
-print((a['All'].iloc[1] / a['All'].iloc[2]) * 100)
-a
+#Can crosstab any variable here.
+crosstab(cohort, 'comp_veri', 'act_flag')
 
-3586/5180
+# +
+#For Table 1
+summary = {}
 
-y_veri = cohort.late_veri.replace({0:1, 1:0})
+for a in analysis_cols:
+    cross = crosstab(cohort, 'comp_veri', a)
+    summary[a] = get_prcts(cross)
+    
+pd.DataFrame(summary).T
+# -
+
+y_veri = cohort.comp_veri
 x_veri = cohort[['act_flag', 'ind_spon', 'drug_trial', 'late_phase', 'N/A', 'quartile_2', 
                  'quartile_3', 'quartile_4']].reset_index(drop=True)
 
 # +
-#Outcome here is having a current verification date
+#Use this cell for crude OR of interest by changeing the value of crude_x
 
-simple_logistic_regression(y_veri,x_veri, cis=.001)
-
-# +
-#Use this cell to check crude regression analysis of interest:
-
-crude_x = cohort[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
+crude_x = cohort[['late_phase', 'N/A']].reset_index(drop=True)
 
 simple_logistic_regression(y_veri,crude_x,cis=.001)
 
 # +
-# veri_rank = create_ranking(cohort, 'late_veri')
+#Outcome here is having a current verification date - adjusted
+
+simple_logistic_regression(y_veri,x_veri, cis=.001)
+
+# +
+veri_rank = create_ranking(cohort, 'late_veri')
 #v_top_10_prct = veri_rank.late_veri.quantile(.95)
 veri_rank_merge = veri_rank.merge(covered_trials, on='sponsor')
 veri_rank_merge['prct'] = round((veri_rank_merge['late_veri'] / veri_rank_merge['covered_trials']) * 100,2)
@@ -447,6 +478,8 @@ veri_rank_merge[veri_rank_merge.covered_trials >= 50].sort_values(by='prct', asc
 # -
 
 # # Certificate Analysis
+
+# Sponsors of trials covered under FDAAA can seek delays to the deadline to seek results under certain circumstances. The Final Rule specified that these certificates must be requested prior to when the results would otherwise become does (i.e., a year from primary completion).
 
 # +
 cert_analysis = df[['nct_id','due_date', 'has_results', 'has_certificate', "certificate_date_qc", "certificate_posted_date",
@@ -503,44 +536,50 @@ plt.tick_params(axis='both', which='major', labelsize=20)
 plt.ylabel('# of Trials', fontsize=25, labelpad=10)
 plt.xlabel('Days Late', fontsize=25, labelpad=10)
 plt.title("c. Days Late to Apply for Certificate of Delay", pad = 20, fontsize = 30)
+plt.show()
 #plt.savefig('figures/late_certificate_1c.svg')
 # -
 
-a = crosstab(certificate, 'on_time_cert', 'act_flag')
-print('Total')
-print(a['All'].iloc[1])
-print((a['All'].iloc[1] / a['All'].iloc[2]) * 100)
-print('')
-print('Compliant')
-print(a[1].iloc[1])
-print((a[1].iloc[1] / a['All'].iloc[1]) * 100)
+#Can crosstab any variable here
+crosstab(certificate, 'on_time_cert', 'act_flag')
 
-a
+# +
+#For Table 1
+summary = {}
+
+for a in analysis_cols:
+    cross = crosstab(certificate, 'on_time_cert', a)
+    summary[a] = get_prcts(cross)
+    
+pd.DataFrame(summary).T
+# -
 
 x_cert = certificate[['act_flag', 'ind_spon', 'drug_trial', 'late_phase', 'N/A', 'quartile_2', 'quartile_3', 
                       'quartile_4']].reset_index(drop=True)
 y_cert = certificate['on_time_cert'].reset_index(drop=True)
 
 # +
+#Use this cell to check crude regression analysis of interest:
+
+crude_x = certificate[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
+
+simple_logistic_regression(y_cert,crude_x,cis=.001)
+
+# +
 #Outcome here is having an on-time certificate
 
 simple_logistic_regression(y_cert,x_cert, cis=.001)
-
-# +
-#Use this cell to check crude regression analysis of interest:
-
-crude_x = certificate[['drug_trial']].reset_index(drop=True)
-
-simple_logistic_regression(y_cert,crude_x,cis=.001)
 # -
 
-## cert_rank = create_ranking(certificate, 'late_cert')
+cert_rank = create_ranking(certificate, 'late_cert')
 #c_top_10_prct = cert_rank.late_cert.quantile(.95)
 cert_rank_merge = cert_rank.merge(covered_trials, on='sponsor')
 cert_rank_merge['prct'] = round((cert_rank_merge['late_cert'] / cert_rank_merge['covered_trials']) * 100,2)
 cert_rank_merge[cert_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).reset_index(drop=True).head(11)
 
 # # Document Analysis
+
+# The Final Rule stipulates that a protocol and statistical analysis plan for covered trials are required to be reported alongside results for trials covered under the FDAAA 2007.
 
 # +
 doc_df = df[['nct_id', 'results_due', 'has_results', 'pending_results', 'has_certificate','results_first_submitted_date', 
@@ -554,7 +593,6 @@ doc_df['primary_completion_date'] = pd.to_datetime(doc_df['primary_completion_da
 doc_df['due_date'] = pd.to_datetime(doc_df['due_date'])
 doc_df['last_updated_date'] = pd.to_datetime(doc_df['last_updated_date'])
 doc_df['results_first_posted_date'] = pd.to_datetime(doc_df['results_first_posted_date'])
-doc_df.head()
 
 # +
 #Describing the population
@@ -569,16 +607,16 @@ print('{} Trials are due to report results, and therefore should have uploaded a
 print('Of these {} due trials have any documents, {} due trials have both documents and results'.format(due_and_docs,due_docs_reported))
 print('{} due trials have documents but no results, {} have no documents but results'.format(no_results_docs, results_no_docs))
 check
-# -
 
+# +
 has_docs_df = doc_df[['nct_id', 'documents']][doc_df.has_documents == 1].reset_index(drop=True)
-
-has_docs_df.to_csv('docs_dataset.csv')
 
 has_docs_ids = has_docs_df.nct_id.to_list()
 
+# +
 #this makes each document it's own row with nct_id as the index
 dfs_list = []
+
 import ast
 has_docs = has_docs_df.copy()
 has_docs['documents'] = has_docs['documents'].apply(ast.literal_eval)
@@ -607,7 +645,6 @@ bad_index = nct_index_df.index[nct_index_df['document_date'] == 'April 10, 1018'
 nct_index_df.at[bad_index,'document_date'] = 'April 10, 2018'
 
 nct_index_df['document_date'] = pd.to_datetime(nct_index_df['document_date'])
-nct_index_df.head()
 
 # +
 #The first time you run this notebook on a new dataset, you can get the data on when the documents 
@@ -616,7 +653,7 @@ nct_index_df.head()
 #you can then re-load.
 
 #If you already have the output from the above exported to CSV, just run this cell pointing to that file
-#if it isn't already in the same directory (this will work assuming no changed to the clones repo)
+#if it isn't already in the same directory (this will work assuming no changed to the cloned repo)
 
 try:
     docs_updates = pd.read_csv(parent + '/data/history_scrape_2021-01-18.csv')
@@ -733,8 +770,6 @@ due_unreported = len(merged[due_unreported_filt])
 unreported_any_docs = len(merged[due_unreported_filt & ((merged.has_protocol == 1) | ((merged.has_sap == 1) | (merged.no_sap == 1)))])
 # -
 
-unreported_any_docs
-
 print(f'''There are {due_results} trials that are due to report and have subsequently completed clinicaltrials.gov \
 quality control meaning results are fully posted. Of these, \
 {prot_and_sap} ({round((prot_and_sap/due_results) * 100, 2)}%) have their protocol and sap included in their record. \
@@ -755,23 +790,33 @@ just_due_results['docs_accounted'] = np.where((just_due_results.has_protocol == 
 
 crosstab(just_due_results, 'docs_accounted', 'act_flag')
 
-3764/3812
-
 # +
+#For Table 1
+summary = {}
+
+for a in analysis_cols:
+    cross = crosstab(just_due_results, 'docs_accounted', a)
+    summary[a] = get_prcts(cross)
+    
+pd.DataFrame(summary).T
+# -
+
 #The regression doesn't converge with 'act_flag' included as it is perfectly predictive, so this is removed
 x_docs = just_due_results[['ind_spon', 'drug_trial', 'late_phase', 'N/A', 'quartile_2', 
                            'quartile_3', 'quartile_4']].reset_index(drop=True)
 y_docs = just_due_results.docs_accounted.reset_index(drop=True)
 
-conf = simple_logistic_regression(y_docs,x_docs, cis=.001)
-conf
-
 # +
 #Use this cell to check crude regression analysis of interest:
 
-crude_x = just_due_results[['drug_trial']].reset_index(drop=True)
+crude_x = just_due_results[['quartile_2', 'quartile_3', 'quartile_4']].reset_index(drop=True)
 
 simple_logistic_regression(y_docs,crude_x,cis=.001)
+
+# +
+#Adjusted regression
+
+simple_logistic_regression(y_docs,x_docs, cis=.001)
 # -
 
 docs_rank = create_ranking(just_due_results, 'docs_accounted', marker = 0)

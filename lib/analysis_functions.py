@@ -71,3 +71,16 @@ def get_count(df, field):
     field -- A string of the column name in the df that contains the data of interest
     """
     return df[['nct_id', field]].groupby(field).count()
+
+def get_prcts(cross):
+    """
+    Easily getting descriptive data for variables of interest.
+    """
+    
+    cats = {}
+    cats['total'] = cross.loc['All']['All']
+    cats['total_var'] = cross.loc[1]['All']
+    cats['prct_total'] = round((cross.loc[1]['All'] / cross.loc['All']['All']) * 100, 1)
+    cats['n_comp'] = cross.loc[1][1]
+    cats['prct_comp'] = round((cross.loc[1][1]/cross.loc[1]['All'])*100, 1)
+    return cats
