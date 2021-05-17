@@ -67,7 +67,7 @@ except FileNotFoundError:
     from lib.data_functions import fda_reg, get_data
 
     fda_reg_dict = fda_reg(old_fda)
-    lines = get_data(path)
+    lines = get_data(path, '2021-01-18')
 
     #headers is just the list of header names to save space here
     from lib.final_df import make_row, make_dataframe, headers

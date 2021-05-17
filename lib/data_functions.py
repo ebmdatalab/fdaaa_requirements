@@ -16,13 +16,13 @@ def fda_reg(path):
             fda_reg_dict[d['nct_id']] = d['is_fda_regulated']
     return fda_reg_dict
 
-def get_data(path):
+def get_data(path, date_str):
     """
     Quick function to load the raw ClinicalTrials.gov data which is a CSV of JSON (can think of as ndjson as well)
     """
 
     with ZipFile(BytesIO(get(path, stream=True).content), 'r') as zf:
-        with zf.open('clinicaltrials_raw_clincialtrials_json_2021-01-18.csv', 'r') as ctgov:
+        with zf.open(f'clinicaltrials_raw_clincialtrials_json_{date_str}.csv', 'r') as ctgov:
             lines = ctgov.readlines()
             return lines
         
