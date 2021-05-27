@@ -46,4 +46,6 @@ The repository has also been set up to run in Docker to ensure a compatible envi
 
 ## How to cite
 
-We will update this section with additional details as they become available.
+You can cite the accompanying paper in [*JAMA Internal Medicine*](https://doi.org/10.1001/jamainternmed.2021.2036)
+
+DeVito NJ, Goldacre B. Evaluation of Compliance With Legal Requirements Under the FDA Amendments Act of 2007 for Timely Registration of Clinical Trials, Data Verification, Delayed Reporting, and Trial Document Submission. JAMA Intern Med 2021; published online May 24. DOI:10.1001/jamainternmed.2021.2036.
