@@ -469,13 +469,25 @@ simple_logistic_regression(y_veri,crude_x,cis=.001)
 simple_logistic_regression(y_veri,x_veri, cis=.001)
 
 # +
+#Getting an overview of late verifications as a percent of all covered trials
+
 veri_rank = create_ranking(cohort, 'late_veri')
 #v_top_10_prct = veri_rank.late_veri.quantile(.95)
 veri_rank_merge = veri_rank.merge(covered_trials, on='sponsor')
 veri_rank_merge['prct'] = round((veri_rank_merge['late_veri'] / veri_rank_merge['covered_trials']) * 100,2)
 
 veri_rank_merge[veri_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).head(11)
+
+# +
+#And here we restrict it to only the percent of those in the population that could have a late verification
+
+only_veri_cohort = cohort[['sponsor', 'late_veri']].groupby('sponsor', as_index=False)['late_veri'].agg(['sum','count'])
+only_veri_cohort['prct'] = round((only_veri_cohort['sum'] / only_veri_cohort['count']) * 100,2)
+merged_veri = only_veri_cohort.merge(covered_trials, on='sponsor')
+merged_veri[merged_veri.covered_trials >= 50].sort_values(by='prct', ascending=False).head(11)
 # -
+
+only_veri_cohort.sort_values(by='sum', ascending=False).head(11)
 
 # # Certificate Analysis
 
@@ -576,6 +588,13 @@ cert_rank = create_ranking(certificate, 'late_cert')
 cert_rank_merge = cert_rank.merge(covered_trials, on='sponsor')
 cert_rank_merge['prct'] = round((cert_rank_merge['late_cert'] / cert_rank_merge['covered_trials']) * 100,2)
 cert_rank_merge[cert_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).reset_index(drop=True).head(11)
+
+only_cert = certificate[['sponsor', 'late_cert']].groupby('sponsor', as_index=False)['late_cert'].agg(['sum','count'])
+only_cert['prct'] = round((only_cert['sum'] / only_cert['count']) * 100,2)
+merged_cert = only_cert.merge(covered_trials, on='sponsor')
+merged_cert[merged_cert.covered_trials >= 50].sort_values(by='prct', ascending=False).head(11)
+
+merged_cert[(merged_cert.covered_trials >= 50) & (merged_cert['count'] >= 5)].sort_values(by='prct', ascending=False).head(15)
 
 # # Document Analysis
 
@@ -823,5 +842,11 @@ docs_rank = create_ranking(just_due_results, 'docs_accounted', marker = 0)
 docs_rank_merge = docs_rank.merge(covered_trials, on='sponsor')
 docs_rank_merge['prct'] = round((docs_rank_merge['docs_accounted'] / docs_rank_merge['covered_trials']) * 100,2)
 docs_rank_merge[docs_rank_merge.covered_trials >= 50].sort_values(by='prct', ascending=False).head(12)
+
+due_results_spon = df[(df.results_due == 1) & (df.has_results == 1)][['sponsor', 'results_due', 'has_results']].groupby('sponsor', as_index=False).sum()
+
+just_due_spon = docs_rank_merge.merge(due_results_spon, how='left', on='sponsor')
+just_due_spon['new_prct'] = round((just_due_spon['docs_accounted'] / just_due_spon['results_due']) * 100,2)
+just_due_spon[just_due_spon.covered_trials >= 50].sort_values(by='new_prct', ascending=False).head(14)
 
 
