@@ -678,7 +678,7 @@ try:
     docs_updates = pd.read_csv(parent + '/data/history_scrape_2021-01-18.csv')
 except FileNotFoundError:
     from lib.trial_history import history_scrape
-    most_recent_doc_update = history_scrape(tqdm(has_docs_ids[820:]), date(2021,1,18))
+    most_recent_doc_update = history_scrape(tqdm(has_docs_ids), date(2021,1,18))
     docs_updates = pd.DataFrame(most_recent_doc_update)
     docs_updates.to_csv('history_scrape_{}.csv'.format(date(2021,1,18)))
 # -
